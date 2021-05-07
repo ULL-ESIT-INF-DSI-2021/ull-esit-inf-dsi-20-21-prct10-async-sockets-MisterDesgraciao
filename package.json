@@ -8,21 +8,28 @@
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "tsc-watch --onSuccess \"node dist/index.js\""
+    "start": "tsc-watch --onSuccess \"node dist/index.js\"",
+    "doc": "typedoc"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@types/chai": "^4.2.17",
     "@types/chalk": "^2.2.0",
+    "@types/mocha": "^8.2.2",
     "@types/node": "^15.0.2",
     "@types/yargs": "^16.0.1",
     "@typescript-eslint/eslint-plugin": "^4.22.1",
     "@typescript-eslint/parser": "^4.22.1",
+    "chai": "^4.3.4",
     "chalks": "^0.1.5",
     "eslint": "^7.25.0",
     "eslint-config-google": "^0.14.0",
+    "mocha": "^8.4.0",
+    "ts-node": "^9.1.1",
     "tsc-watch": "^4.2.9",
+    "typedoc": "^0.20.36",
     "yargs": "^17.0.1"
   },
   "dependencies": {
