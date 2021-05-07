@@ -35,6 +35,7 @@ const server = net.createServer((connection) => {
     console.log(`${datos}`);
     const objetoNota = new Nota(datosCliente.user, datosCliente.title, datosCliente.body, datosCliente.color);
     let respuesta: ResponseType;
+    let timer;
     switch (datosCliente.type) {
       case 'add':
         checkUsersFolder();
@@ -61,68 +62,138 @@ const server = net.createServer((connection) => {
         });
         break;
       case 'modify':
-        checkUsersFolder();
-        checkPrivateFolder(objetoNota);
-        const timer = setTimeout(() => {
+        timer = setTimeout(() => {
           respuesta = {type: 'modify', success: false};
           const respuestaJSON = JSON.stringify(respuesta);
           connection.write(respuestaJSON);
           connection.end();
         }, 5000);
         fs.readdir(`./users`, (err, carpetaUsuario) => {
-          fs.readdir(`./users/${carpetaUsuario}`, (err, ficherosJSON) => {
-            ficherosJSON.forEach((elemento) => {
-              if (elemento === `${objetoNota.getTitulo()}.json`) {
-                fs.rm(`./users/${carpetaUsuario}/${elemento}`, (err) => {
-                  if (err) {
-                    console.log('Error inesperado al borrar la carpeta.');
-                  } else {
-                    const datos = JSON.stringify(objetoNota);
-                    fs.writeFile(`./users/${objetoNota.usuario}/${objetoNota.titulo}.json`, datos, 'utf8', (err) => {
+          if (err) {
+            respuesta = {type: 'modify', success: false};
+            const respuestaJSON = JSON.stringify(respuesta);
+            connection.write(respuestaJSON);
+            connection.end();
+          } else {
+            fs.readdir(`./users/${carpetaUsuario}`, (err, ficherosJSON) => {
+              if (err) {
+                respuesta = {type: 'modify', success: false};
+                const respuestaJSON = JSON.stringify(respuesta);
+                connection.write(respuestaJSON);
+                connection.end();
+              } else {
+                ficherosJSON.forEach((elemento) => {
+                  if (elemento === `${objetoNota.getTitulo()}.json`) {
+                    fs.rm(`./users/${carpetaUsuario}/${elemento}`, (err) => {
                       if (err) {
-                        console.log('Error inesperado al crear el fichero.');
+                        console.log('Error inesperado al borrar la carpeta.');
+                      } else {
+                        const datos = JSON.stringify(objetoNota);
+                        fs.writeFile(`./users/${objetoNota.usuario}/${objetoNota.titulo}.json`, datos, 'utf8', (err) => {
+                          if (err) {
+                            console.log('Error inesperado al crear el fichero.');
+                          }
+                          respuesta = {type: 'modify', success: true};
+                          const respuestaJSON = JSON.stringify(respuesta);
+                          clearTimeout(timer);
+                          connection.write(respuestaJSON);
+                        });
                       }
-                      respuesta = {type: 'modify', success: true};
-                      const respuestaJSON = JSON.stringify(respuesta);
-                      clearTimeout(timer);
-                      connection.write(respuestaJSON);
                     });
                   }
                 });
               }
             });
-          });
+          }
         });
         break;
       case 'delete':
-        /**
-         * const directorios = fs.readdirSync(`./users`);
-      let carpetaUsuario;
-      let datos;
-      let objeto;
-      let borrado: boolean = false;
-      directorios.forEach((carpeta) => {
-        carpetaUsuario = fs.readdirSync(`./users/${carpeta}`);
-        carpetaUsuario.forEach((ficheroJSON) => {
-          datos = fs.readFileSync(`./users/${carpeta}/${ficheroJSON}`);
-          objeto = JSON.parse(datos.toString());
-          if (objeto.titulo === argv.titulo) {
-            fs.rmSync(`./users/${carpeta}/${ficheroJSON}`);
-            console.log(chalk.green.inverse(
-                `Eliminado el fichero ${ficheroJSON}`));
-            borrado = true;
+        timer = setTimeout(() => {
+          respuesta = {type: 'modify', success: false};
+          const respuestaJSON = JSON.stringify(respuesta);
+          connection.write(respuestaJSON);
+          connection.end();
+        }, 3000);
+        fs.readdir(`./users`, (err, carpetaUsuario) => {
+          if (err) {
+            respuesta = {type: 'delete', success: false};
+            const respuestaJSON = JSON.stringify(respuesta);
+            connection.write(respuestaJSON);
+            connection.end();
+          } else {
+            fs.readdir(`./users/${carpetaUsuario}`, (err, ficherosJSON) => {
+              if (err) {
+                respuesta = {type: 'delete', success: false};
+                const respuestaJSON = JSON.stringify(respuesta);
+                connection.write(respuestaJSON);
+                connection.end();
+              } else {
+                ficherosJSON.forEach((elemento) => {
+                  if (elemento === `${objetoNota.getTitulo()}.json`) {
+                    fs.rm(`./users/${carpetaUsuario}/${elemento}`, (err) => {
+                      if (err) {
+                        console.log('Error inesperado al borrar la carpeta.');
+                      } else {
+                        respuesta = {type: 'delete', success: true};
+                        const respuestaJSON = JSON.stringify(respuesta);
+                        clearTimeout(timer);
+                        connection.write(respuestaJSON);
+                      }
+                    });
+                  }
+                });
+              }
+            });
           }
         });
-      });
-      if (!borrado) {
-        console.log(chalk.red.inverse(
-            'ERROR. No existe el fichero que se desea borrar'));
-      }
-         */
         break;
       case 'list':
-        console.log('Por implementar');
-        /** */
+        timer = setTimeout(() => {
+          respuesta = {type: 'modify', success: false};
+          const respuestaJSON = JSON.stringify(respuesta);
+          connection.write(respuestaJSON);
+          connection.end();
+        }, 5000);
+        fs.readdir(`./users`, (err, carpetaUsuario) => {
+          if (err) {
+            respuesta = {type: 'list', success: false};
+            const respuestaJSON = JSON.stringify(respuesta);
+            connection.write(respuestaJSON);
+            connection.end();
+          } else {
+            carpetaUsuario.forEach((carpetaPersonal) => {
+              if (carpetaPersonal === objetoNota.getUsuario()) {
+                fs.readdir(`./users/${carpetaUsuario}`, (err, ficherosJSON) => {
+                  if (err) {
+                    respuesta = {type: 'list', success: false};
+                    const respuestaJSON = JSON.stringify(respuesta);
+                    connection.write(respuestaJSON);
+                    connection.end();
+                  } else {
+                    const filesArray: Nota[] = [];
+                    ficherosJSON.forEach((fichero) => {
+                      fs.readFile(`./users/${carpetaUsuario}/${fichero}`, (err, data) => {
+                        if (err) {
+                          console.log('Error inesperado al leer el fichero.');
+                        } else {
+                          const notaLeida: Nota = JSON.parse(data.toString());
+                          filesArray.push(notaLeida);
+                        }
+                      });
+                    });
+                    // Espera unos segundos a que termine readFile()
+                    setTimeout(() => {
+                      respuesta = {type: 'list', success: true, notes: filesArray};
+                      const respuestaJSON = JSON.stringify(respuesta);
+                      clearTimeout(timer);
+                      connection.write(respuestaJSON);
+                    }, 2000);
+                  }
+                });
+              }
+            });
+          }
+        });
         break;
       case 'read':
         console.log('Por implementar');
@@ -134,9 +205,7 @@ const server = net.createServer((connection) => {
     }
   });
 
-  connection.on('end', () => {
-    // clearTimeout(timer);
-  });
+  connection.on('end', () => {});
 
   connection.on('close', () => {
     console.log('A client has disconnected');

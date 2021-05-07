@@ -1,14 +1,14 @@
 /* eslint-disable max-len */
 import * as net from 'net';
 // import {Nota} from './nota';
-import * as chalk from 'chalk';
+// import * as chalk from 'chalk';
 // import * as fs from 'fs';
 import * as yargs from 'yargs';
 import {RequestType} from './tipos';
 // import {ResponseType} from './tipos';
 // import {Colores} from './nota';
 
-// console.log(chalk.green('Comienza la ejecución!'));
+// console.log(.green('Comienza la ejecución!'));
 /**
  * Comando 'add' que permite a un usuario añadir una nueva Nota.
  * Requiere obligatoriamente los parámetros de: 'usuario', 'titulo',
@@ -67,19 +67,19 @@ yargs.command({
 
         client.on('data', (datos) => {
           const mensaje = JSON.parse(datos.toString());
-          console.log(`Recibimos: ${datos}`);
+          // console.log(`Recibimos: ${datos}`);
           if (mensaje.success) {
-            console.log(chalk.green('Nota añadida exitosamente.'));
+            console.log(('Nota añadida exitosamente.'));
           } else {
-            console.log(chalk.red.inverse('El título de la nota ya existe.'));
+            console.log(('El título de la nota ya existe.'));
           }
           client.destroy();
         });
       } else {
-        console.log(chalk.red.inverse('Color no soportado.'));
+        console.log(('Color no soportado.'));
       }
     } else {
-      console.log(chalk.red.inverse('Falta algún dato al comando.'));
+      console.log(('Falta algún dato al comando.'));
     }
   },
 });
@@ -127,11 +127,11 @@ yargs.command({
 
         client.on('data', (datos) => {
           const mensaje = JSON.parse(datos.toString());
-          console.log(`Recibimos: ${datos}`);
+          // console.log(`Recibimos: ${datos}`);
           if (mensaje.success) {
             console.log(('Nota modificada exitosamente.'));
           } else {
-            console.log(('La nota no existe.'));
+            console.log(('La nota no existe/no se encontró.'));
           }
           client.destroy();
         });
@@ -162,9 +162,60 @@ yargs.command({
   handler(argv) {
     if (typeof argv.titulo === 'string' &&
         typeof argv.usuario === 'string') {
-      console.log('');
+      // enviamos datos por el socket
+      const datosNota: RequestType = {type: 'delete', user: argv.usuario, title: argv.titulo};
+      const client = net.connect({port: 60300});
+      const notaJSON = JSON.stringify(datosNota);
+      client.write(notaJSON);
+
+      client.on('data', (datos) => {
+        const mensaje = JSON.parse(datos.toString());
+        // console.log(`Recibimos: ${datos}`);
+        if (mensaje.success) {
+          console.log(('Nota eliminada exitosamente.'));
+        } else {
+          console.log(('La nota no existe/no se encontró.'));
+        }
+        client.destroy();
+      });
     } else {
-      console.log(chalk.red.inverse('No es el formato esperado de Titulo'));
+      console.log(('No es el formato esperado de Titulo'));
+    }
+  },
+});
+
+yargs.command({
+  command: 'list',
+  describe: 'Listar todos los títulos de todas las notas.',
+  builder: {
+    usuario: {
+      describe: 'Nombre de usuario',
+      demandOption: true,
+      type: 'string',
+    },
+  },
+  handler(argv) {
+    if (typeof argv.usuario === 'string') {
+      const datosNota: RequestType = {type: 'list', user: argv.usuario};
+      const client = net.connect({port: 60300});
+      const notaJSON = JSON.stringify(datosNota);
+      client.write(notaJSON);
+
+      client.on('data', (datos) => {
+        const mensaje = JSON.parse(datos.toString());
+        // console.log(`Recibimos: ${datos}`);
+        if (mensaje.success) {
+          console.log('Los títulos de las Notas son:');
+          mensaje.notes.forEach((notaIndividual) => {
+            console.log(notaIndividual.titulo);
+          });
+        } else {
+          console.log(('El usuario no tiene notas.'));
+        }
+        client.destroy();
+      });
+    } else {
+      console.log('Error. El formato del nombre de usuario es de tipo string.');
     }
   },
 }).parse();
