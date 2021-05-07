@@ -6,6 +6,7 @@ import * as chalk from 'chalk';
 import * as yargs from 'yargs';
 import {RequestType} from './tipos';
 // import {ResponseType} from './tipos';
+// import {Colores} from './nota';
 
 // console.log(chalk.green('Comienza la ejecución!'));
 /**
@@ -68,9 +69,9 @@ yargs.command({
           const mensaje = JSON.parse(datos.toString());
           console.log(`Recibimos: ${datos}`);
           if (mensaje.success) {
-            console.log('Nota añadida exitosamente.');
+            console.log(chalk.green('Nota añadida exitosamente.'));
           } else {
-            console.log('El título de la nota ya existe.');
+            console.log(chalk.red.inverse('El título de la nota ya existe.'));
           }
           client.destroy();
         });
@@ -79,6 +80,91 @@ yargs.command({
       }
     } else {
       console.log(chalk.red.inverse('Falta algún dato al comando.'));
+    }
+  },
+});
+
+yargs.command({
+  command: 'modify',
+  describe: 'Modificar una nota existente.',
+  builder: {
+    usuario: {
+      describe: 'Usuario',
+      demandOption: true,
+      type: 'string',
+    },
+    titulo: {
+      describe: 'Título de la nota',
+      demandOption: true,
+      type: 'string',
+    },
+    cuerpo: {
+      describe: 'Cuerpo de la nota',
+      demandOption: false,
+      type: 'string',
+    },
+    color: {
+      describe: 'Color de la nota',
+      demandOption: true,
+      type: 'string',
+    },
+  },
+  handler(argv) {
+    console.log('PRUEBA');
+    if (typeof argv.titulo === 'string' &&
+        typeof argv.usuario === 'string' &&
+        typeof argv.cuerpo === 'string' &&
+        typeof argv.color === 'string') {
+      if (argv.color === 'Rojo' ||
+          argv.color === 'Verde' ||
+          argv.color === 'Azul' ||
+          argv.color === 'Amarillo') {
+        // enviamos datos por el socket
+        const datosNota: RequestType = {type: 'modify', user: argv.usuario, title: argv.titulo, body: argv.cuerpo, color: argv.color};
+        const client = net.connect({port: 60300});
+        const notaJSON = JSON.stringify(datosNota);
+        client.write(notaJSON);
+
+        client.on('data', (datos) => {
+          const mensaje = JSON.parse(datos.toString());
+          console.log(`Recibimos: ${datos}`);
+          if (mensaje.success) {
+            console.log(('Nota modificada exitosamente.'));
+          } else {
+            console.log(('La nota no existe.'));
+          }
+          client.destroy();
+        });
+      } else {
+        console.log(('Error. El color de la nota no está soportado.'));
+      }
+    } else {
+      console.log(('ERROR. Debe introducir un título, un nuevo cuerpo y/o un nuevo color'));
+    }
+  },
+});
+
+yargs.command({
+  command: 'delete',
+  describe: 'Eliminar una nota existente.',
+  builder: {
+    usuario: {
+      describe: 'Nombre de usuario',
+      demandOption: true,
+      type: 'string',
+    },
+    titulo: {
+      describe: 'Título de la nota',
+      demandOption: true,
+      type: 'string',
+    },
+  },
+  handler(argv) {
+    if (typeof argv.titulo === 'string' &&
+        typeof argv.usuario === 'string') {
+      console.log('');
+    } else {
+      console.log(chalk.red.inverse('No es el formato esperado de Titulo'));
     }
   },
 }).parse();
