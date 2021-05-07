@@ -45,6 +45,11 @@ function checkPrivateFolder(objetoNota) {
  * para poder comprobar los datos del objeto Nota, y en consecuencia, que la variable
  * 'connection' devuelva a través del socket una información acorde.
  *
+ * Primero comprueba si existen las carpetas './users' y la carpeta personal del cliente.
+ * Después comprueba si la nota ya existe (hay alguna Nota con el mismo título).
+ * Si no la hay, crea con `fs.writeFile()` el fichero.
+ * Devuelve si lo consiguió o no con `connection.write()`.
+ *
  * @param objetoNota Objeto de clase Nota
  * @param connection Objeto de clase EventEmitter
  */
@@ -74,6 +79,23 @@ function addFile(objetoNota: Nota, connection) {
   });
 }
 
+/**
+ * Función modifyFile() que modifica el cuerpo y/o el color de la Nota que se le indique.
+ *
+ * Primero crea un **timer**, pues la manera para devolver una respuesta negativa antes el
+ * intento del cliente de modificar algo. Si pasan 5 segundos sin que el resto del código
+ * envíe una respuesta al usuario, se ejecuta este código.
+ *
+ * Mientras tanto, se va buscando la Nota a modificar a través de `fs.readdir()` sobre las carpetas.
+ * Una vez se encuentra el fichero con extensión JSON, lo que hace es borrarlo y después crear uno nuevo
+ * con los que serían los valores modificados.
+ *
+ * Después de eso, devuelve que realizó el comando correctamente enviando el tipo `ResponseType`
+ * a través `connection.write()`.
+ *
+ * @param objetoNota Objeto de clase Nota
+ * @param connection Objeto de clase EventEmitter
+ */
 function modifyFile(objetoNota: Nota, connection) {
   let respuesta: ResponseType;
   const timer = setTimeout(() => {
@@ -122,6 +144,17 @@ function modifyFile(objetoNota: Nota, connection) {
   });
 }
 
+/**
+ * Función deleteFile() que recibe el objeto Nota a borrar y lo elimina.
+ *
+ * Su funcionamiento es prácticamente idéntico a `modifyFile()`, primero crea un temporizador por
+ * si no se llega a realizar ninguna coincidencia. Después busca el fichero JSON
+ * en todas las carpetas de usuarios. Cuando lo encuentra, lo elimina y devuelve al cliente
+ * un mensaje que lo confirma.
+ *
+ * @param objetoNota Objeto de clase Nota
+ * @param connection Objeto de clase EventEmitter
+ */
 function deleteFile(objetoNota: Nota, connection) {
   let respuesta: ResponseType;
   const timer = setTimeout(() => {
@@ -164,6 +197,25 @@ function deleteFile(objetoNota: Nota, connection) {
   });
 }
 
+/**
+ * Función listFiles() que recibe un objeto Nota para saber de qué usuario imprimir
+ * las notas y la conexión para comunicarse con ese cliente.
+ *
+ * Primero se crea el temporizador, por si el usuario no tiene carpeta y/o notas.
+ *
+ * Lo que se hace es leer todas las carpetas dentro de './users' y buscar
+ * la que corresponda al usuario. Una vez la encuentra, lee de ella todos los títulos
+ * de todos los ficheros, además de su contenido, que transforma a clase Nota y las guarda en un array.
+ *
+ * Para evitar los problemas que conlleva el realizar estos métodos asíncronos de `fs`, lo que he
+ * implementado es otro temporizador, que en este caso, espera 2 segundos a que el `forEach()` añada
+ * al array todas las Notas. Es probable que si el usuario tiene muchas notas, 2 segundos no sean suficientes
+ * como para añadirlas todas. Para ese caso habría que ampliar el margen de tiempo o cambiar la manera en que
+ * se "espere" por el `forEach()`.
+ *
+ * @param objetoNota Objeto de clase Nota
+ * @param connection Objeto de clase EventEmitter
+ */
 function listFiles(objetoNota: Nota, connection) {
   let respuesta: ResponseType;
   const timer = setTimeout(() => {
@@ -199,7 +251,7 @@ function listFiles(objetoNota: Nota, connection) {
                   }
                 });
               });
-              // Espera unos segundos a que termine readFile()
+              // Espera dos segundos a que termine readFile()
               setTimeout(() => {
                 respuesta = {type: 'list', success: true, notes: filesArray};
                 const respuestaJSON = JSON.stringify(respuesta);
@@ -214,6 +266,19 @@ function listFiles(objetoNota: Nota, connection) {
   });
 }
 
+/**
+ * Función readFile() que recibe el objeto Nota (incompleto) a leer y la conexión
+ * con el cliente.
+ *
+ * Lo primero que hace es iniciar el temporizador, por si no logra encontrar la nota.
+ *
+ * Después busca en './users' la carpeta del usuario, y dentro de esta carpeta busca el
+ * fichero JSON a leer. Una vez lo encuentra, llama a `fs.readFile()` y envía el objeto Nota
+ * generado en el mensaje `ResponseType` a través de `connection.write()` con destino al cliente.
+ *
+ * @param objetoNota Objeto de clase Nota
+ * @param connection Objeto de clase EventEmitter
+ */
 function readFile(objetoNota: Nota, connection) {
   let respuesta: ResponseType;
   const timer = setTimeout(() => {
@@ -263,6 +328,15 @@ function readFile(objetoNota: Nota, connection) {
   });
 }
 
+/**
+ * Función principal, donde se crea la variable `server` y se establece la `connection`.
+ *
+ * Cuando recibe a través del Socket (connection) un dato, traduce esos datos a un objeto de
+ * clase Nota incompleto (la mayoría de las veces). De esta conexión también recibe un `RequestType`, el cual
+ * indica el `type`, que es el comando a ejecutar por el servidor.
+ *
+ * A través de un switch, llamamos a la función que realice el comando solicitado.
+ */
 const server = net.createServer((connection) => {
   console.log('A client has connected.');
 
@@ -293,13 +367,14 @@ const server = net.createServer((connection) => {
     }
   });
 
-  connection.on('end', () => {});
-
   connection.on('close', () => {
     console.log('A client has disconnected');
   });
 });
 
+/**
+ * Código que indica a nuestro `server` en qué puerto escuchar.
+ */
 server.listen(60300, () => {
   console.log('Waiting for clients to connect.');
 });

@@ -1,14 +1,8 @@
 /* eslint-disable max-len */
 import * as net from 'net';
-// import {Nota} from './nota';
-// import * as chalk from 'chalk';
-// import * as fs from 'fs';
 import * as yargs from 'yargs';
 import {RequestType} from './tipos';
-// import {ResponseType} from './tipos';
-// import {Colores} from './nota';
 
-// console.log('Comienza la ejecución!'));
 /**
  * Comando 'add' que permite a un usuario añadir una nueva Nota.
  * Requiere obligatoriamente los parámetros de: 'usuario', 'titulo',
@@ -18,13 +12,13 @@ import {RequestType} from './tipos';
  * Después comprueba que el color es uno de los
  * 4 soportados (rojo, azul, verde y amarillo).
  *
- * Si la carpeta 'users' no existe, la crea en el punto actual.
- * Si la carpeta del 'usuario' no existe dentro de 'users',
- * también la crea.
+ * Crea una petición de tipo `RequestType` que envía con los datos recibidos
+ * por terminal al Servidor. Este formato permite al Servidor saber qué comando
+ * desea ejecutar el cliente y lo datos que son necesarios para llevarlo a cabo.
  *
- * A continuación, comprueba que ningún otro archivo tenga el mismo Titulo.
- * Si hay alguno que sí, comunica el error.
- * En caso contrario, crea el fichero JSON con los datos otorgados.
+ * El cliente también va a esperar una respuesta en forma de un dato `ResponseType`,
+ * que principalmente sirve para saber si el comando fue ejecutado correctamente,
+ * además de indicar para qué comando y si hay algún objeto Nota que imprimir.
  */
 yargs.command({
   command: 'add',
@@ -67,7 +61,6 @@ yargs.command({
 
         client.on('data', (datos) => {
           const mensaje = JSON.parse(datos.toString());
-          // console.log(`Recibimos: ${datos}`);
           if (mensaje.success) {
             console.log(('Nota añadida exitosamente.'));
           } else {
@@ -84,6 +77,27 @@ yargs.command({
   },
 });
 
+/**
+ * Comando 'modify' que permite al usuario modificar una Nota.
+ *
+ * Como parámetro obligatorio debe recibir el título de la Nota,
+ * para saber qué nota es, y además puede recibir el nuevo cuerpo y/o
+ * color de la Nota.
+ *
+ * Como no sabemos de qué usuario es la Nota, primero leemos los nombres
+ * de todas las carpetas dentro de 'users'. Cada carpeta pertenece a un usuario
+ * distinto. Por cada carpeta, leemos el contenido dentro de cada una:
+ * los archivos JSON. Si el nombre de este coincide con el título, entonces
+ * hemos encontrado el archivo a modificar.
+ *
+ * Leemos los 4 parámetros escritos en el JSON (usuario, título, cuerpo y color)
+ * y cambiamos cuerpo y/o color por su nuevo valor.
+ * Tenemos el nuevo objeto a introducir.
+ *
+ * A continuación, borramos el fichero JSON con los datos antiguos. Creamos un
+ * nuevo objeto Nota con los nuevos valores y creamos un nuevo fichero JSON
+ * con esos nuevos datos.
+ */
 yargs.command({
   command: 'modify',
   describe: 'Modificar una nota existente.',
