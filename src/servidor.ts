@@ -109,7 +109,7 @@ const server = net.createServer((connection) => {
         break;
       case 'delete':
         timer = setTimeout(() => {
-          respuesta = {type: 'modify', success: false};
+          respuesta = {type: 'delete', success: false};
           const respuestaJSON = JSON.stringify(respuesta);
           connection.write(respuestaJSON);
           connection.end();
@@ -149,7 +149,7 @@ const server = net.createServer((connection) => {
         break;
       case 'list':
         timer = setTimeout(() => {
-          respuesta = {type: 'modify', success: false};
+          respuesta = {type: 'list', success: false};
           const respuestaJSON = JSON.stringify(respuesta);
           connection.write(respuestaJSON);
           connection.end();
@@ -196,8 +196,51 @@ const server = net.createServer((connection) => {
         });
         break;
       case 'read':
-        console.log('Por implementar');
-        /** */
+        timer = setTimeout(() => {
+          respuesta = {type: 'read', success: false};
+          const respuestaJSON = JSON.stringify(respuesta);
+          connection.write(respuestaJSON);
+          connection.end();
+        }, 5000);
+        fs.readdir(`./users`, (err, carpetaUsuario) => {
+          if (err) {
+            respuesta = {type: 'read', success: false};
+            const respuestaJSON = JSON.stringify(respuesta);
+            connection.write(respuestaJSON);
+            connection.end();
+          } else {
+            carpetaUsuario.forEach((carpetaPersonal) => {
+              if (carpetaPersonal === objetoNota.getUsuario()) {
+                fs.readdir(`./users/${carpetaUsuario}`, (err, ficherosJSON) => {
+                  if (err) {
+                    respuesta = {type: 'read', success: false};
+                    const respuestaJSON = JSON.stringify(respuesta);
+                    connection.write(respuestaJSON);
+                    connection.end();
+                  } else {
+                    const filesArray: Nota[] = [];
+                    ficherosJSON.forEach((fichero) => {
+                      if (fichero === `${objetoNota.getTitulo()}.json`) {
+                        fs.readFile(`./users/${carpetaUsuario}/${fichero}`, (err, data) => {
+                          if (err) {
+                            console.log('Error inesperado al leer el fichero.');
+                          } else {
+                            const notaLeida: Nota = JSON.parse(data.toString());
+                            filesArray.push(notaLeida);
+                            respuesta = {type: 'read', success: true, notes: filesArray};
+                            const respuestaJSON = JSON.stringify(respuesta);
+                            clearTimeout(timer);
+                            connection.write(respuestaJSON);
+                          }
+                        });
+                      }
+                    });
+                  }
+                });
+              }
+            });
+          }
+        });
         break;
       default:
         console.log('Opción no soportada.');

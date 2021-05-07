@@ -8,7 +8,7 @@ import {RequestType} from './tipos';
 // import {ResponseType} from './tipos';
 // import {Colores} from './nota';
 
-// console.log(.green('Comienza la ejecución!'));
+// console.log('Comienza la ejecución!'));
 /**
  * Comando 'add' que permite a un usuario añadir una nueva Nota.
  * Requiere obligatoriamente los parámetros de: 'usuario', 'titulo',
@@ -110,7 +110,6 @@ yargs.command({
     },
   },
   handler(argv) {
-    console.log('PRUEBA');
     if (typeof argv.titulo === 'string' &&
         typeof argv.usuario === 'string' &&
         typeof argv.cuerpo === 'string' &&
@@ -215,7 +214,48 @@ yargs.command({
         client.destroy();
       });
     } else {
-      console.log('Error. El formato del nombre de usuario es de tipo string.');
+      console.log('Error. El formato del nombre de usuario no es de tipo string.');
+    }
+  },
+});
+
+yargs.command({
+  command: 'read',
+  describe: 'Leer una nota en concreto.',
+  builder: {
+    usuario: {
+      describe: 'Nombre de usuario',
+      demandOption: true,
+      type: 'string',
+    },
+    titulo: {
+      describe: 'Título de la nota',
+      demandOption: true,
+      type: 'string',
+    },
+  },
+  handler(argv) {
+    if (typeof argv.usuario === 'string' && typeof argv.titulo === 'string') {
+      const datosNota: RequestType = {type: 'read', user: argv.usuario, title: argv.titulo};
+      const client = net.connect({port: 60300});
+      const notaJSON = JSON.stringify(datosNota);
+      client.write(notaJSON);
+
+      client.on('data', (datos) => {
+        const mensaje = JSON.parse(datos.toString());
+        // console.log(`Recibimos: ${datos}`);
+        if (mensaje.success) {
+          mensaje.notes.forEach((notaIndividual) => {
+            console.log(notaIndividual.titulo);
+            console.log(notaIndividual.cuerpo);
+          });
+        } else {
+          console.log(('No se ha encontrado la nota a leer.'));
+        }
+        client.destroy();
+      });
+    } else {
+      console.log('Error. El formato del nombre de usuario/titulo no es de tipo string.');
     }
   },
 }).parse();
