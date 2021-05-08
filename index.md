@@ -160,14 +160,131 @@ describe('Comprobaciones RequestType', () => {
 
 #### Fichero Cliente
 
+El fichero Cliente es la parte que he asignado para crear/actualizar los comandos usando `yargs`. Como en el guión de la práctica nos indica que la aplicación debe funcionar ejecutando los comandos en el Cliente pero almacenando la información (las notas) en el Servidor, apenas he tocado la estructura de los mismos.
+
+También comentar que, según estas directrices y mi planteamiento, el resultado de todo este código consiste en enviar los datos necesarios del comando al Servidor y esperar respuesta. Esto se traduce a que el código dentro del *handler* de cada comando es muy parecido al del resto de comandos; solo cambia un par de cosas.
+
+Como ejemplo, solo pondré dos comandos, pues el resto siguen la misma dinámica y explicar todos me parece relleno.
+
+Primero tenemos el comando `add`, el cual recibe como argumentos: el usuario, título, cuerpo y color de la **Nota** a añadir. Lo primero que hace es comprobar que todos estos datos son de tipo *string*, y que el `color` de la **Nota** sea uno de los almacenados en el type `Colores`.
+
+Si todo esto se cumple, entonces se crea un objeto `ResquestType` con todos esos parámetros, se transformará a formato `JSON` para poder enviarlo, se conectará a través de un *Socket* al puerto 60300 para enviarlo al **Servidor**.
+
+Como hemos creado un objeto `EventEmitter` llamado `cliente`, podemos hacer que espere una respuesta (en forma de datos) por ese mismo puerto. Esto lo realizamos llamando a la función `cliente.on('data', () => {})`, que se ejecutará cuando reciba la respuesta del **Servidor** e imprimirá si se realizó correctamente el comando o si falló.
 
 ```typescript
+import * as net from 'net';
+import * as yargs from 'yargs';
+import {RequestType} from './tipos';
 
+yargs.command({
+  command: 'add',
+  describe: 'Añadir una Nota nueva',
+  builder: {
+    usuario: {
+      describe: 'Usuario',
+      demandOption: true,
+      type: 'string',
+    },
+    titulo: {
+      describe: 'Título de la nota',
+      demandOption: true,
+      type: 'string',
+    },
+    cuerpo: {
+      describe: 'Cuerpo de la nota',
+      demandOption: true,
+      type: 'string',
+    },
+    color: {
+      describe: 'Color de la nota',
+      demandOption: true,
+      type: 'string',
+    },
+  },
+  handler(argv) {
+    if (typeof argv.usuario === 'string' &&
+        typeof argv.titulo === 'string' &&
+        typeof argv.cuerpo === 'string' &&
+        typeof argv.color === 'string') {
+      if (argv.color === 'Rojo' ||
+          argv.color === 'Verde' ||
+          argv.color === 'Azul' ||
+          argv.color === 'Amarillo') {
+        const datosNota: RequestType = {type: 'add', user: argv.usuario, title: argv.titulo, body: argv.cuerpo, color: argv.color};
+        const client = net.connect({port: 60300});
+        const notaJSON = JSON.stringify(datosNota);
+        client.write(notaJSON);
+
+        client.on('data', (datos) => {
+          const mensaje = JSON.parse(datos.toString());
+          if (mensaje.success) {
+            console.log(('Nota añadida exitosamente.'));
+          } else {
+            console.log(('El título de la nota ya existe.'));
+          }
+          client.destroy();
+        });
+      } else {
+        console.log(('Color no soportado.'));
+      }
+    } else {
+      console.log(('Falta algún dato al comando.'));
+    }
+  },
+});
 ```
+
+El otro comando que quiero comentar para mostrar la poca diferencia entre los mismo es el comando `list`.
+
+Este comando lista todos los títulos de todas las Notas del usuario que especifiquemos. Es por esto que el único parámetro requerido es el de `usuario`.
+
+El código es prácticamente igual al del comando `add`: comprueba que el nombre de usuario es un *string*, crea el objeto `ResquestType` y lo envía al Servidor.
+
+Espera a recibir la respuesta, y la diferencia llega cuando recibe la información del Servidor en la variable `mensaje`. Si el comando se ejecutó correctamente, entonces `mensaje` contiene todos los objetos de clase `Nota` pertenecientes al usuario especificado. Es de esta manera que, usando un bucle `forEach()`, imprimimos el `título` de todas esas Notas recogidas.
+
+Al igual que el resto de comando, si algún punto de este código falla, se le informa al usuario por terminal del fallo concreto. Si el fallo ocurre en el otro lado de la conexión (el servidor), entonces solo se devuelve que no se consiguió el comando. 
+
+Mi planteamiento es que el Cliente no tiene por qué enterarse del fallo concreto ocurrido en el Servidor.
 
 ```typescript
+yargs.command({
+  command: 'list',
+  describe: 'Listar todos los títulos de todas las notas.',
+  builder: {
+    usuario: {
+      describe: 'Nombre de usuario',
+      demandOption: true,
+      type: 'string',
+    },
+  },
+  handler(argv) {
+    if (typeof argv.usuario === 'string') {
+      const datosNota: RequestType = {type: 'list', user: argv.usuario};
+      const client = net.connect({port: 60300});
+      const notaJSON = JSON.stringify(datosNota);
+      client.write(notaJSON);
 
+      client.on('data', (datos) => {
+        const mensaje = JSON.parse(datos.toString());
+        if (mensaje.success) {
+          console.log('Los títulos de las Notas son:');
+          mensaje.notes.forEach((notaIndividual) => {
+            console.log(notaIndividual.titulo);
+          });
+        } else {
+          console.log(('El usuario no tiene notas.'));
+        }
+        client.destroy();
+      });
+    } else {
+      console.log('Error. El formato del nombre de usuario no es de tipo string.');
+    }
+  },
+});
 ```
+
+Por último, los *tests* realizados sobre este fichero han sido los siguientes: 
 
 ```typescript
 
