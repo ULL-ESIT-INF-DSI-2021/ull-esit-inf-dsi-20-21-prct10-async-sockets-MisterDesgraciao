@@ -84,19 +84,13 @@ yargs.command({
  * para saber qué nota es, y además puede recibir el nuevo cuerpo y/o
  * color de la Nota.
  *
- * Como no sabemos de qué usuario es la Nota, primero leemos los nombres
- * de todas las carpetas dentro de 'users'. Cada carpeta pertenece a un usuario
- * distinto. Por cada carpeta, leemos el contenido dentro de cada una:
- * los archivos JSON. Si el nombre de este coincide con el título, entonces
- * hemos encontrado el archivo a modificar.
+ * Crea una petición de tipo `RequestType` que envía con los datos recibidos
+ * por terminal al Servidor. Este formato permite al Servidor saber qué comando
+ * desea ejecutar el cliente y lo datos que son necesarios para llevarlo a cabo.
  *
- * Leemos los 4 parámetros escritos en el JSON (usuario, título, cuerpo y color)
- * y cambiamos cuerpo y/o color por su nuevo valor.
- * Tenemos el nuevo objeto a introducir.
- *
- * A continuación, borramos el fichero JSON con los datos antiguos. Creamos un
- * nuevo objeto Nota con los nuevos valores y creamos un nuevo fichero JSON
- * con esos nuevos datos.
+ * El cliente también va a esperar una respuesta en forma de un dato `ResponseType`,
+ * que principalmente sirve para saber si el comando fue ejecutado correctamente,
+ * además de indicar para qué comando y si hay algún objeto Nota que imprimir.
  */
 yargs.command({
   command: 'modify',
@@ -140,7 +134,6 @@ yargs.command({
 
         client.on('data', (datos) => {
           const mensaje = JSON.parse(datos.toString());
-          // console.log(`Recibimos: ${datos}`);
           if (mensaje.success) {
             console.log(('Nota modificada exitosamente.'));
           } else {
@@ -157,6 +150,21 @@ yargs.command({
   },
 });
 
+/**
+ * Comando 'delete' que permite al usuario eliminar una Nota.
+ *
+ * Como parámetro obligatorio solo recibe el usuario y título,
+ * para saber que nota exacta eliminar (puede haber notas de diferentes
+ * usuarios con el mismo título).
+ *
+ * Crea una petición de tipo `RequestType` que envía con los datos recibidos
+ * por terminal al Servidor. Este formato permite al Servidor saber qué comando
+ * desea ejecutar el cliente y lo datos que son necesarios para llevarlo a cabo.
+ *
+ * El cliente también va a esperar una respuesta en forma de un dato `ResponseType`,
+ * que principalmente sirve para saber si el comando fue ejecutado correctamente,
+ * además de indicar para qué comando y si hay algún objeto Nota que imprimir.
+ */
 yargs.command({
   command: 'delete',
   describe: 'Eliminar una nota existente.',
@@ -183,7 +191,6 @@ yargs.command({
 
       client.on('data', (datos) => {
         const mensaje = JSON.parse(datos.toString());
-        // console.log(`Recibimos: ${datos}`);
         if (mensaje.success) {
           console.log(('Nota eliminada exitosamente.'));
         } else {
@@ -197,6 +204,20 @@ yargs.command({
   },
 });
 
+/**
+ * Comando 'list' que muestra todos los Títulos de todas las Notas del Cliente.
+ *
+ * Como única parámetro debe recibir el nombre de usuario, para saber las notas
+ * de quién leer.
+ *
+ * Crea una petición de tipo `RequestType` que envía con los datos recibidos
+ * por terminal al Servidor. Este formato permite al Servidor saber qué comando
+ * desea ejecutar el cliente y lo datos que son necesarios para llevarlo a cabo.
+ *
+ * El cliente también va a esperar una respuesta en forma de un dato `ResponseType`,
+ * que principalmente sirve para saber si el comando fue ejecutado correctamente,
+ * además de indicar para qué comando y si hay algún objeto Nota que imprimir.
+ */
 yargs.command({
   command: 'list',
   describe: 'Listar todos los títulos de todas las notas.',
@@ -216,7 +237,6 @@ yargs.command({
 
       client.on('data', (datos) => {
         const mensaje = JSON.parse(datos.toString());
-        // console.log(`Recibimos: ${datos}`);
         if (mensaje.success) {
           console.log('Los títulos de las Notas son:');
           mensaje.notes.forEach((notaIndividual) => {
@@ -233,6 +253,20 @@ yargs.command({
   },
 });
 
+/**
+ * Comando 'read' que permite leer el contenido de una Nota con el color
+ * especificado.
+ *
+ * Como únicos parámetro debe recibir el usuario y título de la nota, para localizarla.
+ *
+ * Crea una petición de tipo `RequestType` que envía con los datos recibidos
+ * por terminal al Servidor. Este formato permite al Servidor saber qué comando
+ * desea ejecutar el cliente y lo datos que son necesarios para llevarlo a cabo.
+ *
+ * El cliente también va a esperar una respuesta en forma de un dato `ResponseType`,
+ * que principalmente sirve para saber si el comando fue ejecutado correctamente,
+ * además de indicar para qué comando y si hay algún objeto Nota que imprimir.
+ */
 yargs.command({
   command: 'read',
   describe: 'Leer una nota en concreto.',
@@ -257,7 +291,6 @@ yargs.command({
 
       client.on('data', (datos) => {
         const mensaje = JSON.parse(datos.toString());
-        // console.log(`Recibimos: ${datos}`);
         if (mensaje.success) {
           mensaje.notes.forEach((notaIndividual) => {
             console.log(notaIndividual.titulo);
