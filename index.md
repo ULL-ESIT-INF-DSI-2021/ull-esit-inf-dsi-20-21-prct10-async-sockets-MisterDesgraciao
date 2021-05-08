@@ -292,24 +292,375 @@ Por último, los *tests* realizados sobre este fichero han sido los siguientes:
 
 #### Fichero Servidor
 
-```typescript
+Este fichero **servidor.ts** es el lugar a donde he trasladado todo el código referente a operar con las Notas en formato JSON. He adaptado la idea y planteamiento de cada uno de los comandos, pues había que cambiar todas las funciones de `fs` a su versión asíncrona, la cual funciona diferente.
 
+El propósito de este código es de ser una función principal donde llegan los diferentes datos de los clientes, y en función de qué comando quieren realizar, llamar a la función correspondiente.
+
+Así pues, a pesar de que esta parte del código está al final del fichero, es la que primero voy a comentar para establecer un orden más lógico al informe.
+
+Lo primero que ocurre al ejecutar este código fuente es que se crear un objeto servidor con `net.createServer()`. Este servidor es un objeto de clase `Socket`, y que debemos indicar con la función `server.listen()` en qué puerto escuchar para poder funcionar.
+
+Si nos adentramos en la función en sí, la variable `connection` es la que apunta a este puerto. Para poder recoger los datos que envían los clientes, usamos `connection.on()` e indicamos `data` como valor a tener en cuenta. 
+
+En esta parte es en la que reconvertimos los datos de formato JSON a un objeto `RequestType` y `Nota` (incompleto la mayoría de veces). De esta manera, podemos averiguar qué comando realizar y qué datos otorgar al comando.
+
+Usamos un `switch` para esta tarea y llamamos al método que se corresponda al comando, pasando también la conexión con el cliente (`connection`) y los datos de la `Nota`.
+
+```typescript
+const server = net.createServer((connection) => {
+  console.log('A client has connected.');
+  connection.on('data', (datos) => {
+    console.log('Recibimos datos.');
+    const datosCliente = JSON.parse(datos.toString());
+    console.log(`${datos}`);
+    const objetoNota = new Nota(datosCliente.user, datosCliente.title, datosCliente.body, datosCliente.color);
+    switch (datosCliente.type) {
+      case 'add':
+        addFile(objetoNota, connection);
+        break;
+      case 'modify':
+        modifyFile(objetoNota, connection);
+        break;
+      case 'delete':
+        deleteFile(objetoNota, connection);
+        break;
+      case 'list':
+        listFiles(objetoNota, connection);
+        break;
+      case 'read':
+        readFile(objetoNota, connection);
+        break;
+      default:
+        console.log('Opción no soportada.');
+        break;
+    }
+  });
+
+  connection.on('close', () => {
+    console.log('A client has disconnected');
+  });
+});
+
+server.listen(60300, () => {
+  console.log('Waiting for clients to connect.');
+});
 ```
 
-```typescript
+La primera función que nos encontramos en el fichero es `checkUsersFolder()`, la cual es una función modular que comprueba si existe la carpeta **./users** en el directorio donde nos encontramos, y en caso de que no, la crea.
 
-```
-
-```typescript
-
-```
+Solo la uso para el comando `add`, de manera que tengo el código un poco más ordenado.
 
 ```typescript
-
+function checkUsersFolder() {
+  fs.access(`./users`, fs.constants.F_OK, (err) => {
+    if (err) {
+      console.log('No existe la carpeta users.');
+      console.log('Creando la carpeta users.');
+      fs.mkdir(`./users`, () => {});
+    }
+  });
+}
 ```
+
+Esta función llamada `checkPrivateFolder()` recibe un objeto de clase `Nota` para comprobar si dentro de la carpeta **./users** existe la carpeta asociada al nombre de usuario de esa nota. Si no existe la carpeta, la crea.
+
+También se usa únicamente para el comando `add`.
+
+```typescript
+function checkPrivateFolder(objetoNota) {
+  fs.access(`./users/${objetoNota.usuario}`, fs.constants.F_OK, (err) => {
+    if (err) {
+      console.log(`No existe la carpeta ${objetoNota.usuario}.`);
+      console.log(`Creando la carpeta ${objetoNota.usuario}.`);
+      fs.mkdir(`./users/${objetoNota.usuario}`, () => {});
+    }
+  });
+}
+```
+
+Función para realizar el comando `add` sobre la carpeta de Notas. Debe recibir el objeto `Nota` para poder escribirlo y la conexión con el socket `connection` para poder cerrarla, ya sea porque falla en algún punto o porque se ha realizado exitosamente el comando.
+
+Lo primero que hacemos es comprobar que la carpeta **./users** existe y también la carpeta de usuario dentro de ./users. Para ellos llamamos a las dos funciones anteriores.
+
+Lo siguiente que hacemos es intentar acceder, dentro de la carpeta de usuario, a un fichero que tenga el mismo título que la `Nota`. De esta manera comprobamos si ya existe un fichero JSON con el mismo nombre. En caso de **no** exista la nota (falle el `fs.access()`), se crea el fichero JSON con los datos del objeto y se envía por el socket una `respuesta` de tipo `ResponseType` que indica que el comando ha sido realizado con éxito. En caso de que no falle, es decir, tiene éxito en leer el fichero, se envía una `respuesta` con `success: false`. 
+
+```typescript
+function addFile(objetoNota: Nota, connection) {
+  checkUsersFolder();
+  checkPrivateFolder(objetoNota);
+  let respuesta: ResponseType;
+  fs.access(`./users/${objetoNota.usuario}/${objetoNota.titulo}.json`, fs.constants.F_OK, (err) => {
+    if (err) {
+      // Transformamos los datos a formato JSON.
+      const datos = JSON.stringify(objetoNota);
+      fs.writeFile(`./users/${objetoNota.usuario}/${objetoNota.titulo}.json`, datos, 'utf8', (err) => {
+        if (err) {
+          console.log('Error inesperado al crear el fichero.');
+        }
+      });
+      console.log('Añadimos la Nota.');
+      respuesta = {type: 'add', success: true};
+      const respuestaJSON = JSON.stringify(respuesta);
+      connection.write(respuestaJSON);
+    } else {
+      console.log('ERROR. El título ya existe.');
+      respuesta = {type: 'add', success: false};
+      const respuestaJSON = JSON.stringify(respuesta);
+      connection.write(respuestaJSON);
+    }
+  });
+}
+```
+
+La función `modifyFile()` recibe los nuevos datos de la `Nota` a modificar, además de la conexión con el socket.
+
+Lo primero que hace es crear un **temporizador** de 5 segundos. Si el resto del código tarda más de ese tiempo en enviar una `respuesta` al Cliente, entonces se comunicará al mismo que el comando ha fallado y cerrar la conexión. Mi lógica detrás de esto es que necesito una manera de enviar un respuesta fallida cuando el comando **no encuentre el fichero a modificar o falle en algún punto**. 
+
+Su único incoveniente es que, para cantidades grandes de ficheros, puede tardar más de 5 segundos en encontrarlo, a pesar de que exista. Para solucionar eso, habría que ampliar el tiempo o cambiar el temporizador por otra alternativa más robusta.
+
+Continuando con el resto del código, es muy simple, comprueba que existe **./users** (si no existe, no lo crea), comprueba que existe la carpeta personal del usuario (si no existe, no la crea), y por cada uno de los ficheros dentro de la carpeta privada, compara el título con el de la `Nota` a modificar. Si en algún punto falla, devuelve el mensaje negativo y cierra la línea.
+
+Si lo encuentra, lo que hace es borrar el fichero para poder crear después uno con el mismo título pero con los datos (ya sea el cuerpo del mensaje o el color de la nota), actualizados. En tal caso, termina enviando un mensaje positivo al cliente.
+
+```typescript
+function modifyFile(objetoNota: Nota, connection) {
+  let respuesta: ResponseType;
+  const timer = setTimeout(() => {
+    respuesta = {type: 'modify', success: false};
+    const respuestaJSON = JSON.stringify(respuesta);
+    connection.write(respuestaJSON);
+    connection.end();
+  }, 5000);
+  fs.readdir(`./users`, (err, carpetaUsuario) => {
+    if (err) {
+      respuesta = {type: 'modify', success: false};
+      const respuestaJSON = JSON.stringify(respuesta);
+      connection.write(respuestaJSON);
+      connection.end();
+    } else {
+      fs.readdir(`./users/${carpetaUsuario}`, (err, ficherosJSON) => {
+        if (err) {
+          respuesta = {type: 'modify', success: false};
+          const respuestaJSON = JSON.stringify(respuesta);
+          connection.write(respuestaJSON);
+          connection.end();
+        } else {
+          ficherosJSON.forEach((elemento) => {
+            if (elemento === `${objetoNota.getTitulo()}.json`) {
+              fs.rm(`./users/${carpetaUsuario}/${elemento}`, (err) => {
+                if (err) {
+                  console.log('Error inesperado al borrar la carpeta.');
+                } else {
+                  const datos = JSON.stringify(objetoNota);
+                  fs.writeFile(`./users/${objetoNota.usuario}/${objetoNota.titulo}.json`, datos, 'utf8', (err) => {
+                    if (err) {
+                      console.log('Error inesperado al crear el fichero.');
+                    }
+                    respuesta = {type: 'modify', success: true};
+                    const respuestaJSON = JSON.stringify(respuesta);
+                    clearTimeout(timer);
+                    connection.write(respuestaJSON);
+                  });
+                }
+              });
+            }
+          });
+        }
+      });
+    }
+  });
+}
+```
+
+Para borrar un fichero tenemos la función `deleteFile()`. Recibe, como todas, un objeto `Nota` con la información necesaria y la conexión del socket.
+
+También crear un termporizador por si no se encuentra el fichero a eliminar.
+
+Su código es prácticamente igual a la función de `modify`: comprueba la existencia de la carpeta **./users** y la carpeta personal del usuario dentro de ella. Después pasa a leer todos los ficheros dentro de esa carpeta hasta encontrar el deseado. Una vez confirmado que es el que buscamos, lo borramos y devolvemos un mensaje a través del Socket confirmando que así ha sido.
+
+Si en algún punto de la función falla algo o se tarda mucho, se envía un mensaje negativo al cliente y se cierra la conexión.
+
+```typescript
+function deleteFile(objetoNota: Nota, connection) {
+  let respuesta: ResponseType;
+  const timer = setTimeout(() => {
+    respuesta = {type: 'delete', success: false};
+    const respuestaJSON = JSON.stringify(respuesta);
+    connection.write(respuestaJSON);
+    connection.end();
+  }, 3000);
+  fs.readdir(`./users`, (err, carpetaUsuario) => {
+    if (err) {
+      respuesta = {type: 'delete', success: false};
+      const respuestaJSON = JSON.stringify(respuesta);
+      connection.write(respuestaJSON);
+      connection.end();
+    } else {
+      fs.readdir(`./users/${carpetaUsuario}`, (err, ficherosJSON) => {
+        if (err) {
+          respuesta = {type: 'delete', success: false};
+          const respuestaJSON = JSON.stringify(respuesta);
+          connection.write(respuestaJSON);
+          connection.end();
+        } else {
+          ficherosJSON.forEach((elemento) => {
+            if (elemento === `${objetoNota.getTitulo()}.json`) {
+              fs.rm(`./users/${carpetaUsuario}/${elemento}`, (err) => {
+                if (err) {
+                  console.log('Error inesperado al borrar la carpeta.');
+                } else {
+                  respuesta = {type: 'delete', success: true};
+                  const respuestaJSON = JSON.stringify(respuesta);
+                  clearTimeout(timer);
+                  connection.write(respuestaJSON);
+                }
+              });
+            }
+          });
+        }
+      });
+    }
+  });
+}
+```
+
+Para poder listar todas las Notas de un usuario tenemos la función `listFiles()`. 
+
+El temporizador es por si el usuario no tiene `Notas` y el resto del código termina sin enviar nada.
+
+Para comenzar hace lo esperado: comprobar la existencia de **./users** y la carpeta personal. Dentro de la segunda va comprobando los diferentes ficheros JSON, los cuales va leyendo y transformando a objetos de clase `Nota` para poder añadirlos a un array. Una vez ha leído todos, son enviamos al cliente a través del Socket junto a una positiva del mensaje.
+
+Para poder realizar esta lectura y transferencia de Notas, necesito un poco de secuencialidad, es decir, que el Socket espere a que `fs.readFile()` termine, pues solo entonces el array contendrá las Notas. Para hacer esto, he vuelto a hacer uso de un **temporizador**. En este caso, he creado un temporizador de 2 segundos, tiempo suficiente para almacenar las Notas en el array, y después enviar el `ResponseType` con toda la información hacia el cliente.
+
+```typescript
+function listFiles(objetoNota: Nota, connection) {
+  let respuesta: ResponseType;
+  const timer = setTimeout(() => {
+    respuesta = {type: 'list', success: false};
+    const respuestaJSON = JSON.stringify(respuesta);
+    connection.write(respuestaJSON);
+    connection.end();
+  }, 6000);
+  fs.readdir(`./users`, (err, carpetaUsuario) => {
+    if (err) {
+      respuesta = {type: 'list', success: false};
+      const respuestaJSON = JSON.stringify(respuesta);
+      connection.write(respuestaJSON);
+      connection.end();
+    } else {
+      carpetaUsuario.forEach((carpetaPersonal) => {
+        if (carpetaPersonal === objetoNota.getUsuario()) {
+          fs.readdir(`./users/${carpetaUsuario}`, (err, ficherosJSON) => {
+            if (err) {
+              respuesta = {type: 'list', success: false};
+              const respuestaJSON = JSON.stringify(respuesta);
+              connection.write(respuestaJSON);
+              connection.end();
+            } else {
+              const filesArray: Nota[] = [];
+              ficherosJSON.forEach((fichero) => {
+                fs.readFile(`./users/${carpetaUsuario}/${fichero}`, (err, data) => {
+                  if (err) {
+                    console.log('Error inesperado al leer el fichero.');
+                  } else {
+                    const notaLeida: Nota = JSON.parse(data.toString());
+                    filesArray.push(notaLeida);
+                  }
+                });
+              });
+              // Espera dos segundos a que termine readFile()
+              setTimeout(() => {
+                respuesta = {type: 'list', success: true, notes: filesArray};
+                const respuestaJSON = JSON.stringify(respuesta);
+                clearTimeout(timer);
+                connection.write(respuestaJSON);
+              }, 2000);
+            }
+          });
+        }
+      });
+    }
+  });
+}
+```
+
+Por último, tenemos el comando `read` que invoca a esta función `readFile()`.
+
+Para notificar al cliente que no se encontró la Nota a leer, usamos otro temporizador de 5 segundos, que devuelve una respuesta negativa en caso de que se tarde esa cantidad de tiempo.
+
+Para poder leer la nota primero tiene que encontrarla. Comprueba que dentro de **./users** existe la carpeta personal del usuario y dentro de esta segunda, existe el fichero JSON a leer. Una vez lo encuentra, invoca el método `fs.readFile()` para obtener todos los datos de la nota. Transforma estos datos a un objeto `Nota`, lo añade a un array y este array se incluye también en el `ResponseType` que se envia en este momento por el socket.
+
+De esta manera, el cliente recibe su objeto `Nota` completo.
+
+```typescript
+function readFile(objetoNota: Nota, connection) {
+  let respuesta: ResponseType;
+  const timer = setTimeout(() => {
+    respuesta = {type: 'read', success: false};
+    const respuestaJSON = JSON.stringify(respuesta);
+    connection.write(respuestaJSON);
+    connection.end();
+  }, 5000);
+  fs.readdir(`./users`, (err, carpetaUsuario) => {
+    if (err) {
+      respuesta = {type: 'read', success: false};
+      const respuestaJSON = JSON.stringify(respuesta);
+      connection.write(respuestaJSON);
+      connection.end();
+    } else {
+      carpetaUsuario.forEach((carpetaPersonal) => {
+        if (carpetaPersonal === objetoNota.getUsuario()) {
+          fs.readdir(`./users/${carpetaUsuario}`, (err, ficherosJSON) => {
+            if (err) {
+              respuesta = {type: 'read', success: false};
+              const respuestaJSON = JSON.stringify(respuesta);
+              connection.write(respuestaJSON);
+              connection.end();
+            } else {
+              const filesArray: Nota[] = [];
+              ficherosJSON.forEach((fichero) => {
+                if (fichero === `${objetoNota.getTitulo()}.json`) {
+                  fs.readFile(`./users/${carpetaUsuario}/${fichero}`, (err, data) => {
+                    if (err) {
+                      console.log('Error inesperado al leer el fichero.');
+                    } else {
+                      const notaLeida: Nota = JSON.parse(data.toString());
+                      filesArray.push(notaLeida);
+                      respuesta = {type: 'read', success: true, notes: filesArray};
+                      const respuestaJSON = JSON.stringify(respuesta);
+                      clearTimeout(timer);
+                      connection.write(respuestaJSON);
+                    }
+                  });
+                }
+              });
+            }
+          });
+        }
+      });
+    }
+  });
+}
+```
+
+Por último, comentar que no he realizado ningún *test* sobre este fichero...
 
 #### Dificultades
 
+Las principales dificultades que me han aparecido a lo largo de este proyecto han sido:
+- Crear el esquema de cliente - servidor. A pesar de que ha sido mucho más fácil y sencillo de lo que esperaba en un momento, sí que ha supuesto una nueva manera de plantear este ejercicio.
+- Cambiar todas las funciones síncronas por sus versiones asíncronas. Ya que esta práctica está basada directamente en la número 8, lo que estaba reutilizando de allí eran todo métodos síncronos. Como en la práctica 9 ya hemos aprendido a operar con los métodos asíncronos, creí necesario el deshacerme de todo y volver a hacer lo mismo pero desde una implementación asíncrona. 
+- El uso de Sockets. Al principio me costó un poco el hacer funcionar el socket. Sin embargo, probando con el ejemplo dado en clase/en los apuntes, entendí lo sencillo que era y conseguí hacerlo funcionar a mi conveniencia.
+- **No he conseguido usar chalk**. Imagino se habrá notado, pero en la ejecución del cliente ningún código tiene ningún color. Esto se debe a que durante las ejecuciones, si había cualquier cosa del módulo **chalk** declarada, saltaba un error. 
+- - No he logrado hacer que no falle. Creo que el error proviene de un fallo que cometí al intentar instalar el paquete **chalk**. Lo he intentado instalar varias veces usando diferentes sentencias y creo que de ahí proviene el error: reconoce *chalk* como herramienta pero no sus opciones de color o inverso. 
+- - - En cualquier caso, mi decisión final ha sido no usar el paquete para poder tener no perder tiempo en él y poder realizar ejecuciones del programa.
 
 #### Conclusión
 
+Con esta práctica he aprendido a usar *sockets* de manera básica en Typescript. Al final, no ha resultado complicado porque su cometido es enviar la información de una máquina a otra, lo cual puede adquirir la complejidad que uno quiera para su programa.
+
+También he podido revisar una práctica anterior y actualizarla a una versión más realista de la misma. Siempre es gratificante mirar al pasado y darte cuenta de que ahora trabajas un poquito mejor.
+
+El cambiar los métodos síncronos por sus versiones asíncronas también es algo que he reforzado, después de la primera toma de contacto con la práctica 9.
+
+Como conclusión, esta es una práctica para comprobar que uno ha aprendido a programar con una ejecución asíncrona del programa y no secuencial, además de primera toma de contacto con los sockets.
