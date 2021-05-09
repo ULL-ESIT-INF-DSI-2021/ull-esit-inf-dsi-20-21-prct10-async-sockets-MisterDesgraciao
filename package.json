@@ -8,8 +8,9 @@
   },
   "scripts": {
     "test": "mocha",
+    "coverage": "nyc npm test && nyc report --reporter=text-lcov | coveralls && rm -rf .nyc_output",
     "start": "tsc-watch --onSuccess \"node dist/index.js\"",
-    "doc": "typedoc"
+    "doc": "typedoc; touch ./docs/.nojekyll"
   },
   "keywords": [],
   "author": "",
@@ -24,9 +25,11 @@
     "@typescript-eslint/parser": "^4.22.1",
     "chai": "^4.3.4",
     "chalks": "^0.1.5",
+    "coveralls": "^3.1.0",
     "eslint": "^7.25.0",
     "eslint-config-google": "^0.14.0",
     "mocha": "^8.4.0",
+    "nyc": "^15.1.0",
     "ts-node": "^9.1.1",
     "tsc-watch": "^4.2.9",
     "typedoc": "^0.20.36",
