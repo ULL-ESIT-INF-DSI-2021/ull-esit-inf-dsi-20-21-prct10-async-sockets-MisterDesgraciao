@@ -284,10 +284,33 @@ yargs.command({
 });
 ```
 
-Por último, los *tests* realizados sobre este fichero han sido los siguientes: 
+Por último, he intentado realizar test sobre este fichero pero no los he conseguido ejecutar. Me he basado en el ejemplo incorporado en los apuntes de **Sockets**, pero la manera que añade el objeto `EventEmitter` al objeto de clase `MessageEventEmitterClient` (clase hecha en esos apuntes) no la puedo/sé reproducir entre un servidor y un cliente.
+
+El tests aportado aquí abajo falla con un comentario concreto además: `Error: Timeout of 2000ms exceeded. For async tests and hooks, ensure "done()" is called; if returning a Promise, ensure it resolves.` 
+
+Sugiere que me he olvidado del `done()`, pero no es así. Creo que no estoy comunicando muy bien el servidor y el cliente y es por eso que el segundo se queda esperando para siempre.
+
+En cualquier caso, este es el test más cercano a ejecutarse, aunque no lo haya conseguido.
 
 ```typescript
+import 'mocha';
+import {expect} from 'chai';
+import {Socket} from 'events';
+import * as net from 'net';
 
+describe('Comprobando funcionalidades del socket', () => {
+  it('Se envía el Request', (done) => {
+    const server = net.createServer(() => {});
+    const client = net.connect({port: 60300});
+    client.on('data', (datos) => {
+      expect(datos).to.eql({'type': 'list', 'user': 'oscar'});
+      done();
+    });
+
+    server.listen(60300, () => {});
+    server.emit('data', '{"type": "list", "user": "oscar"}');
+  });
+});
 ```
 
 #### Fichero Servidor
