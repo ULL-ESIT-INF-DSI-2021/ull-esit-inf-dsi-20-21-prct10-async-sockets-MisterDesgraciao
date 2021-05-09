@@ -1,0 +1,1 @@
+{"processes":{"2cbe1abc-f723-4949-92cc-5a26b544cd39":{"parent":"8f88cc4a-eccf-44c7-858a-52a26beff484","children":[]},"8f88cc4a-eccf-44c7-858a-52a26beff484":{"parent":null,"children":["2cbe1abc-f723-4949-92cc-5a26b544cd39"]}},"files":{"/home/usuario/p10-ejercicios/src/nota.ts":["2cbe1abc-f723-4949-92cc-5a26b544cd39"]},"externalIds":{}}
